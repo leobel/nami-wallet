@@ -93,7 +93,7 @@ test('expect mainnet', async () => {
 });
 
 test('expect testnet address', async () => {
-  await setNetwork({ id: 'testnet', node: NODE.testnet });
+  await setNetwork({ id: 'testnet', node: NODE.blockfrost.testnet });
   const account = await getCurrentAccount();
   expect(account.paymentAddr).toContain('addr_');
 });

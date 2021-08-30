@@ -10,6 +10,9 @@ import {
   Spinner,
   Checkbox,
   Input,
+	RadioGroup,
+	Stack,
+	Radio,
 } from '@chakra-ui/react';
 import {
   ChevronLeftIcon,
@@ -55,6 +58,7 @@ const Settings = () => {
           <Route exact path="/settings/general" component={GeneralSettings} />
           <Route exact path="/settings/whitelisted" component={Whitelisted} />
           <Route exact path="/settings/network" component={Network} />
+          <Route exact path="/settings/provider" component={Provider} />
         </Switch>
       </Box>
     </>
@@ -105,6 +109,18 @@ const Overview = () => {
         }}
       >
         Network
+      </Button>
+			<Box height="1" />
+      <Button
+        justifyContent="space-between"
+        width="65%"
+        rightIcon={<ChevronRightIcon />}
+        variant="ghost"
+        onClick={() => {
+          history.push('/settings/provider');
+        }}
+      >
+        Provider
       </Button>
     </>
   );
@@ -280,12 +296,12 @@ const Network = () => {
             if (e.target.checked) {
               setSettings({
                 ...settings,
-                network: { id: NETWORK_ID.testnet, node: NODE.testnet },
+                network: { id: NETWORK_ID.testnet, node: NODE[settings.provider].testnet },
               });
             } else {
               setSettings({
                 ...settings,
-                network: { id: NETWORK_ID.mainnet, node: NODE.mainnet },
+                network: { id: NETWORK_ID.mainnet, node: NODE[settings.provider].mainnet },
               });
             }
           }}
@@ -308,5 +324,38 @@ const Network = () => {
     </>
   );
 };
+
+const Provider = () => {
+	const settings = useStoreState((state) => state.settings.settings);
+  const setSettings = useStoreActions(
+    (actions) => actions.settings.setSettings
+  );
+	return (
+    <>
+      <Box height="10" />
+      <Text fontSize="lg" fontWeight="bold">
+        Provider
+      </Text>
+			<Box height="6" />
+			<Box display="flex">
+			<RadioGroup 
+			value={settings.provider}
+			onChange={(provider) => {
+						setSettings({
+							...settings,
+							provider: provider,
+							network: { ...settings.network, node: NODE[provider][settings.network.id] },
+						});
+           
+          }}>
+				<Stack>
+					<Radio value="blockfrost">Blockfrost</Radio>
+					<Radio value="tangocrypto">Tangocrypto</Radio>
+				</Stack>
+			</RadioGroup>
+			</Box>
+    </>
+  );
+}
 
 export default Settings;

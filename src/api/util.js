@@ -1,4 +1,4 @@
-import { getNetwork } from './extension';
+import { getNetwork, getProvider } from './extension';
 import provider from '../config/provider';
 import Loader from './loader';
 import { NETWORK_ID } from '../config/config';
@@ -9,12 +9,20 @@ import {
   MultiAsset,
 } from '@emurgo/cardano-serialization-lib-browser/cardano_serialization_lib';
 import AssetFingerprint from '@emurgo/cip14-js';
+import blockfrost from './extension/providers.js/blockfrost';
+import tangocrypto from './extension/providers.js/tangocrypto';
 
-export const blockfrostRequest = async (endpoint, headers, body) => {
+export const getApiProvider = async () => {
+	const provider = await getProvider();
+	return provider == 'blockfrost' ? blockfrost : tangocrypto;
+}
+
+export const apiRequest = async (endpoint, headers, body) => {
   const network = await getNetwork();
+	const apiProvider = await getProvider();
   return await fetch(provider.api.base(network.node) + endpoint, {
     headers: {
-      ...provider.api.key(network.id),
+      ...provider.api.key(apiProvider, network.id),
       ...headers,
       'User-Agent': 'nami-wallet',
     },
@@ -174,6 +182,15 @@ export const utxoFromJson = async (output, address) => {
       await assetsToValue(output.amount)
     )
   );
+};
+
+export const addressToHex = async (address) => {
+  await Loader.load();
+  const paymentAddr = Buffer.from(
+    Loader.Cardano.Address.from_bech32(address).to_bytes(),
+    'hex'
+  ).toString('hex');
+  return paymentAddr;
 };
 
 /**

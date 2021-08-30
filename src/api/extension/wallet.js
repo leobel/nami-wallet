@@ -2,12 +2,13 @@ import { getUtxos, signTx, submitTx } from '.';
 import { ERROR, EVENT, SENDER, TARGET, TX } from '../../config/config';
 import Loader from '../loader';
 import CoinSelection from '../../lib/coinSelection';
-import { blockfrostRequest, multiAssetCount } from '../util';
+import { getApiProvider, multiAssetCount } from '../util';
 
 export const initTx = async () => {
-  const latest_block = await blockfrostRequest('/blocks/latest');
-  const p = await blockfrostRequest(`/epochs/${latest_block.epoch}/parameters`);
-
+	const provider = await getApiProvider();
+  const latest_block = await provider.getLatestBlock();
+  const p = await provider.getEpochParameters(latest_block.epoch);
+	console.log('Epoch Parameters:', p);
   return {
     linearFee: Loader.Cardano.LinearFee.new(
       Loader.Cardano.BigNum.from_str(p.min_fee_a.toString()),

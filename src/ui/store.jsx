@@ -2,7 +2,9 @@ import React from 'react';
 import {
   getCurrency,
   getNetwork,
+  getProvider,
   setCurrency,
+	setProvider,
   setNetwork,
 } from '../api/extension';
 import { NETWORK_ID, NODE } from '../config/config';
@@ -21,6 +23,7 @@ const settings = {
   settings: null,
   setSettings: action((state, settings) => {
     setCurrency(settings.currency);
+    setProvider(settings.provider);
     setNetwork(settings.network);
     state.settings = {
       ...settings,
@@ -31,10 +34,12 @@ const settings = {
 
 const initSettings = async (setSettings) => {
   const currency = await getCurrency();
+	const provider = await getProvider();
   const network = await getNetwork();
   setSettings({
     currency: currency || 'usd',
-    network: network || { id: NETWORK_ID.mainnet, node: NODE.mainnet },
+		provider: provider || 'blockfrost',
+    network: network || { id: NETWORK_ID.mainnet, node: NODE[provider || 'blockfrost'].mainnet },
     adaSymbol: network ? (network.id === NETWORK_ID.mainnet ? '₳' : 't₳') : '₳',
   });
 };

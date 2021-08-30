@@ -14,9 +14,9 @@ import { isIPFS } from 'ipfs';
 import React from 'react';
 import { toUnit } from '../../../api/extension';
 import {
-  blockfrostRequest,
   convertMetadataPropToString,
   linkToSrc,
+	getApiProvider,
 } from '../../../api/util';
 import AssetPopover from './assetPopover';
 
@@ -42,7 +42,8 @@ const AssetBadge = ({ asset, onRemove, onInput, onLoad }) => {
       setToken({ ...asset });
       return;
     }
-    const result = await blockfrostRequest(`/assets/${asset.unit}`);
+		let provider = await getApiProvider();
+    const result = await provider.getAsset(asset.unit);
     const name =
       (result.onchain_metadata && result.onchain_metadata.name) ||
       (result.metadata && result.metadata.name) ||

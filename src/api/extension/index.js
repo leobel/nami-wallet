@@ -8,7 +8,6 @@ import {
   SENDER,
   STORAGE,
   TARGET,
-  TxSendError,
   TxSignError,
 } from '../../config/config';
 import { POPUP_WINDOW } from '../../config/config';
@@ -18,10 +17,9 @@ import Loader from '../loader';
 import { createAvatar } from '@dicebear/avatars';
 import * as style from '@dicebear/avatars-bottts-sprites';
 import {
-  blockfrostRequest,
+	addressToHex,
+  getApiProvider,
   networkNameToId,
-  utxoFromJson,
-  assetsToValue,
   valueToAssets,
 } from '../util';
 
@@ -100,61 +98,30 @@ export const setCurrency = (currency) =>
   setStorage({ [STORAGE.currency]: currency });
 
 export const getDelegation = async () => {
+	const provider = await getApiProvider();
   const currentAccount = await getCurrentAccount();
-  const stake = await blockfrostRequest(
-    `/accounts/${currentAccount.rewardAddr}`
-  );
-  if (!stake || stake.error || !stake.pool_id) return {};
-  const delegation = await blockfrostRequest(
-    `/pools/${stake.pool_id}/metadata`
-  );
-  if (!delegation || delegation.error) return {};
-  return {
-    active: stake.active,
-    rewards: stake.withdrawable_amount,
-    homepage: delegation.homepage,
-    poolId: stake.pool_id,
-    ticker: delegation.ticker,
-    description: delegation.description,
-    name: delegation.name,
-  };
+	return provider.getPoolDelegation(currentAccount.rewardAddr);
+  
 };
 
 export const getBalance = async () => {
-  await Loader.load();
-  const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/addresses/${currentAccount.paymentAddr}`
-  );
-  if (result.error) {
-    if (result.status_code === 400) throw APIError.InvalidRequest;
-    else if (result.status_code === 500) throw APIError.InternalError;
-    else return Loader.Cardano.Value.new(Loader.Cardano.BigNum.from_str('0'));
-  }
-  const value = await assetsToValue(result.amount);
-  return value;
+	const provider = await getApiProvider();
+	const currentAccount = await getCurrentAccount();
+	return provider.getAddressBalance(currentAccount.paymentAddr);
 };
 
 export const getFullBalance = async () => {
+	const provider = await getApiProvider();
   const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/accounts/${currentAccount.rewardAddr}`
-  );
-  if (result.error) return '0';
-  return (
-    BigInt(result.controlled_amount) - BigInt(result.withdrawable_amount)
-  ).toString();
+  return provider.getStakeBalance(currentAccount.rewardAddr);
 };
 
 export const setBalanceWarning = async () => {
+	const provider = await getApiProvider();
   const currentAccount = await getCurrentAccount();
   const network = await getNetwork();
   let warning = { active: false, fullBalance: '0' };
-
-  const result = await blockfrostRequest(
-    `/accounts/${currentAccount.rewardAddr}/addresses?count=2`
-  );
-
+  const result = await provider.getAddresses(currentAccount.rewardAddr);
   if (result.length > 1) {
     const fullBalance = await getFullBalance();
     if (fullBalance !== currentAccount[network.id].lovelace) {
@@ -167,40 +134,29 @@ export const setBalanceWarning = async () => {
 };
 
 export const getTransactions = async (paginate = 1, count = 10) => {
+	const provider = await getApiProvider();
   const currentAccount = await getCurrentAccount();
-  const result = await blockfrostRequest(
-    `/addresses/${currentAccount.paymentAddr}/transactions?page=${paginate}&order=desc&count=${count}`
-  );
-  if (!result || result.error) return [];
-  return result.map((tx) => ({
-    txHash: tx.tx_hash,
-    txIndex: tx.tx_index,
-    blockHeight: tx.block_height,
-  }));
+	return provider.getAddressTransactions(currentAccount.paymentAddr, count, paginate);
 };
 
 export const getTxInfo = async (txHash) => {
-  const result = await blockfrostRequest(`/txs/${txHash}`);
-  if (!result || result.error) return null;
-  return result;
+	const provider = await getApiProvider();
+	return provider.getTransaction(txHash);
 };
 
 export const getBlock = async (blockHashOrNumb) => {
-  const result = await blockfrostRequest(`/blocks/${blockHashOrNumb}`);
-  if (!result || result.error) return null;
-  return result;
+	const provider = await getApiProvider();
+  return provider.getBlock(blockHashOrNumb);
 };
 
 export const getTxUTxOs = async (txHash) => {
-  const result = await blockfrostRequest(`/txs/${txHash}/utxos`);
-  if (!result || result.error) return null;
-  return result;
+	const provider = await getApiProvider();
+  return provider.getTransactionUtxos(txHash);
 };
 
 export const getTxMetadata = async (txHash) => {
-  const result = await blockfrostRequest(`/txs/${txHash}/metadata`);
-  if (!result || result.error) return null;
-  return result;
+	const provider = await getApiProvider();
+  return provider.getTransactionMetadata(txHash);
 };
 
 export const updateTxInfo = async (txHash) => {
@@ -250,30 +206,12 @@ export const setTxDetail = async (txObject) => {
  * @returns
  */
 export const getUtxos = async (amount = undefined, paginate = undefined) => {
+	const provider = await getApiProvider();
   const currentAccount = await getCurrentAccount();
   let result = [];
   let page = paginate && paginate.page ? paginate.page + 1 : 1;
-  const limit = paginate && paginate.limit ? `&count=${paginate.limit}` : '';
-  while (true) {
-    let pageResult = await blockfrostRequest(
-      `/addresses/${currentAccount.paymentAddr}/utxos?page=${page}${limit}`
-    );
-    if (pageResult.error) {
-      if (result.status_code === 400) throw APIError.InvalidRequest;
-      else if (result.status_code === 500) throw APIError.InternalError;
-      else {
-        pageResult = [];
-      }
-    }
-    result = result.concat(pageResult);
-    if (pageResult.length <= 0 || paginate) break;
-    page++;
-  }
-
-  const address = await getAddress();
-  let converted = await Promise.all(
-    result.map(async (utxo) => await utxoFromJson(utxo, address))
-  );
+  const limit = paginate && paginate.limit ? paginate.limit : 100;
+	let converted = await provider.getAddressUtxos(currentAccount.paymentAddr, page, limit);
   // filter utxos
   if (amount) {
     await Loader.load();
@@ -290,17 +228,8 @@ export const getUtxos = async (amount = undefined, paginate = undefined) => {
         unspent.output().amount().compare(filterValue) !== -1
     );
   }
+	console.log('Get Utxos', JSON.stringify(converted));
   return converted;
-};
-
-export const getAddress = async () => {
-  await Loader.load();
-  const currentAccount = await getCurrentAccount();
-  const paymentAddr = Buffer.from(
-    Loader.Cardano.Address.from_bech32(currentAccount.paymentAddr).to_bytes(),
-    'hex'
-  ).toString('hex');
-  return paymentAddr;
 };
 
 export const getRewardAddress = async () => {
@@ -317,16 +246,22 @@ export const getCurrentAccountIndex = () => getStorage(STORAGE.currentAccount);
 
 export const getNetwork = () => getStorage(STORAGE.network);
 
+export const getProvider = () => getStorage(STORAGE.provider); 
+
+export const setProvider = (provider) => 
+	setStorage({ [STORAGE.provider]: provider });
+
 export const setNetwork = async (network) => {
   const currentNetwork = await getNetwork();
+	const currentProvider = await getProvider();
   let id;
   let node;
   if (network.id === NETWORK_ID.mainnet) {
     id = NETWORK_ID.mainnet;
-    node = NODE.mainnet;
+    node = NODE[currentProvider].mainnet;
   } else {
     id = NETWORK_ID.testnet;
-    node = NODE.testnet;
+    node = NODE[currentProvider].testnet;
   }
   if (network.node) node = network.node;
   if (currentNetwork.id !== id) emitNetworkChange(networkNameToId(id));
@@ -649,18 +584,8 @@ export const signTx = async (
  */
 
 export const submitTx = async (tx) => {
-  const result = await blockfrostRequest(
-    `/tx/submit`,
-    { 'Content-Type': 'application/cbor' },
-    Buffer.from(tx, 'hex')
-  );
-  if (result.error) {
-    if (result.status_code === 400) throw TxSendError.Failure;
-    else if (result.status_code === 500) throw APIError.InternalError;
-    else if (result.status_code === 429) throw TxSendError.Refused;
-    else throw APIError.InvalidRequest;
-  }
-  return result;
+	const provider = await getApiProvider();
+  return provider.submitTx(tx);
 };
 
 const emitNetworkChange = async (networkId) => {
@@ -726,7 +651,8 @@ export const onAccountChange = (callback) => {
 
 export const switchAccount = async (accountIndex) => {
   await setStorage({ [STORAGE.currentAccount]: accountIndex });
-  const address = await getAddress();
+  const currentAccount = await getCurrentAccount();
+  const address = await addressToHex(currentAccount.paymentAddr);
   emitAccountChange([address]);
   return true;
 };
@@ -842,8 +768,9 @@ export const createWallet = async (name, seedPhrase, password) => {
   const checkStore = await getStorage(STORAGE.encryptedKey);
   if (checkStore) throw new Error(ERROR.storeNotEmpty);
   await setStorage({ [STORAGE.encryptedKey]: encryptedRootKey });
+  await setStorage({ [STORAGE.provider]: 'blockfrost' });
   await setStorage({
-    [STORAGE.network]: { id: NETWORK_ID.mainnet, node: NODE.mainnet },
+    [STORAGE.network]: { id: NETWORK_ID.mainnet, node: NODE.blockfrost.mainnet },
   });
 
   await setStorage({

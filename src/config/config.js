@@ -55,11 +55,18 @@ export const STORAGE = {
   currentAccount: 'currentAccount',
   network: 'network',
   currency: 'currency',
+	provider: 'provider',
 };
 
 export const NODE = {
-  mainnet: 'https://cardano-mainnet.blockfrost.io/api/v0',
-  testnet: 'https://cardano-testnet.blockfrost.io/api/v0',
+	blockfrost: {
+		mainnet: 'https://cardano-mainnet.blockfrost.io/api/v0',
+		testnet: 'https://cardano-testnet.blockfrost.io/api/v0',
+	},
+	tangocrypto: {
+		mainnet: 'https:/u0b30i57vd.execute-api.us-west-1.amazonaws.com/v1',
+		testnet: 'https:/u0b30i57vd.execute-api.us-west-1.amazonaws.com/v1',
+	}
 };
 
 export const NETWORK_ID = {

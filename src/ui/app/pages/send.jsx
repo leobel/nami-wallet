@@ -184,6 +184,7 @@ const Send = () => {
     setAccount(currentAccount);
     const utxos = await getUtxos();
     const protocolParameters = await initTx();
+		console.log('protocol parameters:', protocolParameters);
     setLoaded(true);
     const utxoSum = await sumUtxos(utxos);
     let balance = await valueToAssets(utxoSum);

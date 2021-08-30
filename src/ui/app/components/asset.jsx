@@ -9,9 +9,9 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import {
-  blockfrostRequest,
   convertMetadataPropToString,
   linkToSrc,
+	getApiProvider,
 } from '../../../api/util';
 import AssetPopover from './assetPopover';
 
@@ -33,7 +33,8 @@ const Asset = ({ asset, onLoad, storedAssets, port }) => {
       setToken({ ...storedAssets[asset.unit], quantity: asset.quantity });
       return;
     }
-    const result = await blockfrostRequest(`/assets/${asset.unit}`);
+		const provider = await getApiProvider();
+    const result = await provider.getAsset(asset.unit);
     const name =
       (result.onchain_metadata && result.onchain_metadata.name) ||
       (result.metadata && result.metadata.name) ||
