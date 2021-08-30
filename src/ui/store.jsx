@@ -3,6 +3,7 @@ import {
   getCurrency,
   getNetwork,
   getProvider,
+  requestAccountKey,
   setCurrency,
 	setProvider,
   setNetwork,
@@ -14,10 +15,22 @@ import {
   useStoreActions,
   StoreProvider,
   useStoreState,
+  persist,
+  useStoreRehydrated,
 } from 'easy-peasy';
 import { Box, Text } from '@chakra-ui/layout';
 import { InfoOutlineIcon } from '@chakra-ui/icons';
 import { Spinner } from '@chakra-ui/react';
+import {
+  needUpgrade,
+  needPWD,
+  migrate,
+  setPWD,
+  isUpgrade,
+} from '../lib/migration';
+import ConfirmModal from './app/components/confirmModal';
+import { UpgradeModal } from './app/components/UpgradeModal';
+import { sendStore } from './app/pages/send';
 
 const settings = {
   settings: null,
@@ -31,6 +44,21 @@ const settings = {
     };
   }),
 };
+
+const routeStore = {
+  route: null,
+  setRoute: action((state, route) => {
+    state.route = route;
+  }),
+};
+
+const globalModel = persist(
+  {
+    routeStore,
+    sendStore,
+  },
+  { storage: 'localStorage' }
+);
 
 const initSettings = async (setSettings) => {
   const currency = await getCurrency();
@@ -46,6 +74,7 @@ const initSettings = async (setSettings) => {
 
 // create the global store object
 const store = createStore({
+  globalModel,
   settings,
 });
 
@@ -59,31 +88,75 @@ const StoreInit = ({ children }) => {
   const actions = useStoreActions((actions) => actions);
   const state = useStoreState((state) => state);
   const settings = state.settings.settings;
-  const [loading, setLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const isRehydrated = useStoreRehydrated();
+  const [info, setInfo] = React.useState(null);
+  const [password, setPassword] = React.useState(false);
+  const refA = React.useRef();
+  const refB = React.useRef();
 
   const init = async () => {
-    await initStore(state, actions);
-    setLoading(false);
+    if (await needUpgrade()) {
+      await upgrade();
+    } else {
+      await initStore(state, actions);
+      setIsLoading(false);
+      if (info && info.length) {
+        refB.current.openModal();
+      }
+    }
+  };
+
+  const upgrade = async () => {
+    let pwdReq = await needPWD();
+    if (pwdReq) {
+      refA.current.openModal();
+      return;
+    }
+    let isUp = await isUpgrade();
+    let info = await migrate();
+    setInfo(isUp ? info : false);
   };
 
   React.useEffect(() => {
     init();
-  }, []);
+  }, [password, info]);
   return (
     <>
-      {loading ? (
-        <Box
-          height="100vh"
-          width="full"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Spinner color="teal" speed="0.5s" />
-        </Box>
+      {isLoading || !isRehydrated ? (
+        <>
+          <Box
+            height="100vh"
+            width="full"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Spinner color="teal" speed="0.5s" />
+          </Box>
+
+          <ConfirmModal
+            ref={refA}
+            title="Upgrades requires password"
+            sign={async (pwd) => {
+              await requestAccountKey(pwd, 0);
+              setPWD(pwd);
+            }}
+            onConfirm={async (status) => {
+              if (status === true) {
+                setPassword(true);
+                refA.current.closeModal();
+              }
+            }}
+            onCloseBtn={() => {
+              window.close();
+            }}
+          />
+        </>
       ) : (
         <>
           {children}
+          {info && info.length ? <UpgradeModal info={info} ref={refB} /> : ''}
           {/* Settings Overlay */}
           {settings.network.id === NETWORK_ID.testnet && (
             <Box
