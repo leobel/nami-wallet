@@ -122,6 +122,8 @@ const Wallet = () => {
     setInterval(async () => {
       const currentAccount = await getCurrentAccount();
       const transactions = await getTransactions();
+			console.log('Transactions:', transactions);
+			console.log('Account history:', currentAccount.history);
       if (
         transactions.length > 0 &&
         !currentAccount.history.confirmed.includes(transactions[0].txHash)

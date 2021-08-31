@@ -8,7 +8,6 @@ export const initTx = async () => {
 	const provider = await getApiProvider();
   const latest_block = await provider.getLatestBlock();
   const p = await provider.getEpochParameters(latest_block.epoch);
-	console.log('Epoch Parameters:', p);
   return {
     linearFee: {
       minFeeA: p.min_fee_a.toString(),

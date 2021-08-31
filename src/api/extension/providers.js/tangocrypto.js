@@ -258,8 +258,6 @@ class TangoCrypto {
 
 	async assetsToValue(ada, assets) {
 		await Loader.load();
-		console.log('AssetsToValue ADA', ada);
-		console.log('AssetsToValue Asses', JSON.stringify(assets));
 		const value = Loader.Cardano.Value.new(
 			Loader.Cardano.BigNum.from_str(ada.toString())
 		);
@@ -281,7 +279,6 @@ class TangoCrypto {
 		});
 
 		if (assets.length > 0) value.set_multiasset(multiAsset);
-		console.log('Finished !');
 		return value;
 	}
 

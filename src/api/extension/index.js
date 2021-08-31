@@ -228,7 +228,6 @@ export const getUtxos = async (amount = undefined, paginate = undefined) => {
         unspent.output().amount().compare(filterValue) !== -1
     );
   }
-	console.log('Get Utxos', JSON.stringify(converted));
   return converted;
 };
 
